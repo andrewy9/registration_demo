@@ -10,6 +10,7 @@ import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
+import java.util.Optional;
 import java.util.UUID;
 
 @Service
@@ -29,21 +30,24 @@ public class AppUserService implements UserDetailsService {
     }
 
     public String signUpUser(AppUser appUser) {
-        boolean userExists = appUserRepository
-                .findByEmail(appUser.getEmail())
-                .isPresent();
+        Optional<AppUser> user = appUserRepository
+                .findByEmail(appUser.getEmail());
+
+        boolean userExists = user.isPresent();
+
         if (userExists) {
-            throw new IllegalStateException("email is already taken");
+            boolean isEnabled = user.get().getEnabled();
+            if (isEnabled) {
+                throw new IllegalStateException("email is already taken");
+            }
+        } else {
+            String encodedPassword = bCryptPasswordEncoder.encode(appUser.getPassword());
+            appUser.setPassword(encodedPassword);
+            appUserRepository.save(appUser);
         }
 
-        String encodedPassword = bCryptPasswordEncoder.encode(appUser.getPassword());
-
-        appUser.setPassword(encodedPassword);
-
-        appUserRepository.save(appUser);
-
+        //TODO: What to do after token expiry for a repeated email request
         String token = UUID.randomUUID().toString();
-
         ConfirmationToken confirmationToken = new ConfirmationToken(
                 token,
                 LocalDateTime.now(),
@@ -52,8 +56,6 @@ public class AppUserService implements UserDetailsService {
         );
 
         confirmationTokenService.saveConfirmationToken(confirmationToken);
-
-        //TODO: Send email
 
         return token;
     }

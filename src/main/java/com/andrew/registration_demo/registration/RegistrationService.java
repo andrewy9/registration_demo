@@ -1,12 +1,14 @@
 package com.andrew.registration_demo.registration;
 
 import com.andrew.registration_demo.appuser.AppUser;
+import com.andrew.registration_demo.appuser.AppUserRepository;
 import com.andrew.registration_demo.appuser.AppUserRole;
 import com.andrew.registration_demo.appuser.AppUserService;
 import com.andrew.registration_demo.email.EmailSender;
 import com.andrew.registration_demo.registration.token.ConfirmationToken;
 import com.andrew.registration_demo.registration.token.ConfirmationTokenService;
 import lombok.AllArgsConstructor;
+import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -59,6 +61,13 @@ public class RegistrationService {
 
         if (expiredAt.isBefore(LocalDateTime.now())) {
             throw new IllegalStateException("token expired");
+        }
+
+        UserDetails user = appUserService.loadUserByUsername(
+                confirmationToken.getAppUser().getEmail());
+
+        if (user != null && user.isEnabled()) {
+            throw new IllegalStateException("email already confirmed by a different token");
         }
 
         confirmationTokenService.setConfirmedAt(token);
